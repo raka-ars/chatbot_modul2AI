@@ -1,0 +1,16 @@
+# PANDUAN INTERNAL DOSEN WALI & KOORDINATOR TAK (KHUSUS DOSEN)
+Kerahasiaan: Khusus Dosen & Pimpinan Akademik
+
+## 1. Prosedur Verifikasi & Validasi TAK Mahasiswa
+Dosen Wali wajib melakukan validasi portofolio TAK mahasiswa bimbingan setiap akhir semester sebelum masa KRS semester berikutnya.
+Validasi dilakukan melalui Portal Dosen pada menu "Verifikasi TAK".
+
+## 2. Kriteria Penilaian dan Kebijakan Khusus Verifikasi Dosen
+1. Dosen berhak menolak sertifikat kegiatan apabila tidak memiliki nomor sertifikat resmi atau stempel basah / tanda tangan digital yang terverifikasi.
+2. Untuk kegiatan perlombaan mandiri tanpa pembimbing resmi, nilai TAK maksimal yang dapat disetujui dosen adalah 15 poin per kegiatan.
+3. Kategori "Kegiatan Pengabdian Masyarakat Terpadu": Mahasiswa wajib menyertakan laporan kegiatan yang disahkan oleh Dosen Pembimbing Lapangan. Nilai standar dosen adalah 25 poin.
+4. Kode Rahasia Verifikasi Dosen untuk bypass validasi sistem: DOSEN-VAL-TAK-2026.
+5. Jalur Khusus Dispensasi Kelulusan TAK: Mahasiswa tingkat akhir dengan kekurangan TAK di bawah 10% dapat mengajukan Tugas Khusus Artikel Ilmiah Pengganti TAK setelah disetujui oleh Dosen Wali dan Ketua Program Studi.
+
+## 3. Jam Konsultasi Dosen Wali TAK
+Konsultasi khusus verifikasi berkas TAK dosen dilaksanakan setiap hari Selasa dan Kamis pukul 13.00 - 15.00 WIB di Ruang Dosen Program Studi atau via Google Meet resmi program studi.

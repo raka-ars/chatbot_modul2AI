@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard — Chatbot RAG Berbasis RBAC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+  <style>
+    .bg-grid {
+      background-image: radial-gradient(rgba(99, 102, 241, 0.08) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+  </style>
+</head>
+<body class="bg-[#FAFAFB] text-zinc-900 font-sans antialiased min-h-screen">
+
+  <!-- Toast Notification -->
+  <div id="toast" class="hidden fixed bottom-5 right-5 z-50 flex items-center gap-2 bg-zinc-900 text-white text-xs font-medium px-4 py-2.5 rounded-xl shadow-lg transition">
+    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+    <span id="toastText"></span>
+  </div>
+
+  <!-- Chunks Modal Popup -->
+  <div id="chunksModal" class="hidden fixed inset-0 z-50 bg-zinc-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white border border-zinc-200 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[82vh] flex flex-col overflow-hidden">
+      <div class="px-5 py-4 border-b border-zinc-100 flex items-center justify-between gap-3">
+        <div class="min-w-0">
+          <h3 id="modalDocTitle" class="text-sm font-semibold text-zinc-900 truncate">Detail Chunks</h3>
+          <p id="modalDocMeta" class="text-xs text-zinc-500 mt-0.5"></p>
+        </div>
+        <button type="button" onclick="closeChunksModal()" class="text-zinc-400 hover:text-zinc-700 p-1.5 rounded-lg hover:bg-zinc-100 transition cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div id="modalChunksList" class="p-5 overflow-y-auto overflow-x-hidden space-y-3 bg-zinc-50/50 flex-1"></div>
+      <div class="px-5 py-3 border-t border-zinc-100 bg-white flex justify-end">
+        <button type="button" onclick="closeChunksModal()" class="text-xs font-medium text-zinc-700 bg-zinc-100 hover:bg-zinc-200 px-4 py-2 rounded-xl transition cursor-pointer">
+          Tutup
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chatbot Test Modal Popup -->
+  <div id="chatModal" class="hidden fixed inset-0 z-50 bg-zinc-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white border border-zinc-200 rounded-2xl shadow-2xl w-full max-w-2xl h-[82vh] flex flex-col overflow-hidden">
+      <div class="px-5 py-3.5 border-b border-zinc-100 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white flex items-center justify-center shadow-xs shrink-0 font-bold text-xs">
+            RAG
+          </div>
+          <div class="min-w-0">
+            <h3 class="text-sm font-semibold text-zinc-900 truncate">Uji Coba Chatbot RAG</h3>
+            <p class="text-[11px] text-zinc-500">Uji respons berdasarkan role pengguna</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <select id="adminChatRole" class="text-xs bg-zinc-100 border border-zinc-200 rounded-lg px-2.5 py-1.5 text-zinc-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium">
+            <option value="mahasiswa">Role: Mahasiswa</option>
+            <option value="dosen">Role: Dosen</option>
+          </select>
+          <button type="button" onclick="clearAdminChat()" class="text-[11px] font-medium text-zinc-600 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 px-2.5 py-1.5 rounded-lg transition cursor-pointer">
+            Bersihkan
+          </button>
+          <button type="button" onclick="closeChatModal()" class="text-zinc-400 hover:text-zinc-700 p-1.5 rounded-lg hover:bg-zinc-100 transition cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div id="adminChatBox" class="flex-1 p-5 overflow-y-auto overflow-x-hidden space-y-4 bg-zinc-50/50">
+        <div class="bg-white border border-zinc-200/80 rounded-xl p-5 text-center my-6">
+          <p class="text-xs font-medium text-zinc-700">Uji Coba Chatbot RAG Multi-Role</p>
+          <p class="text-[11px] text-zinc-400 mt-1">Pilih role di kanan atas lalu ajukan pertanyaan untuk menguji hak akses RBAC dokumen.</p>
+        </div>
+      </div>
+
+      <div class="p-3.5 border-t border-zinc-100 bg-white">
+        <form id="adminChatForm" class="bg-zinc-50 border border-zinc-200/90 rounded-xl p-1.5 flex items-center gap-2 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-400 transition">
+          <input
+            id="adminQuestionInput"
+            type="text"
+            placeholder="Tulis pertanyaan untuk menguji chatbot..."
+            autocomplete="off"
+            class="flex-1 px-3 py-1.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none bg-transparent"
+            required
+          />
+          <button
+            id="adminSendBtn"
+            type="submit"
+            class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-xs font-medium px-3.5 py-2 rounded-lg shadow-xs transition cursor-pointer"
+          >
+            <span>Kirim</span>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+            </svg>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Tracking Kuota Groq API -->
+  <div id="quotaModal" class="hidden fixed inset-0 z-50 bg-zinc-950/40 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white border border-zinc-200 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+      <div class="px-5 py-4 border-b border-zinc-100 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          </div>
+          <div class="min-w-0">
+            <h3 class="text-sm font-semibold text-zinc-900">Tracking Kuota Groq API</h3>
+            <p id="quotaModelInfo" class="text-xs text-zinc-500 mt-0.5 truncate">Memuat status...</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button type="button" onclick="loadGroqQuota()" class="text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1.5 rounded-lg transition cursor-pointer">
+            Refresh
+          </button>
+          <button type="button" onclick="closeQuotaModal()" class="text-zinc-400 hover:text-zinc-700 p-1.5 rounded-lg hover:bg-zinc-100 transition cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div id="quotaContent" class="p-5 overflow-y-auto space-y-4 bg-zinc-50/40">
+        <div class="text-center text-xs text-zinc-400 py-8">Memuat data kuota...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Login Section -->
+  <section id="loginSection" class="min-h-screen bg-grid flex items-center justify-center p-4">
+    <div class="bg-white border border-zinc-200/80 rounded-2xl shadow-xl shadow-zinc-200/40 w-full max-w-sm p-7">
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white flex items-center justify-center shadow-sm shadow-indigo-500/25">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-base font-semibold tracking-tight text-zinc-900">Login Admin</h1>
+          <p class="text-xs text-zinc-500">Panel Manajemen RBAC &amp; Dokumen</p>
+        </div>
+      </div>
+
+      <div id="loginError" class="hidden mb-4 text-xs bg-red-50 text-red-700 border border-red-200 rounded-xl p-3"></div>
+
+      <form id="loginForm" class="space-y-3.5">
+        <div>
+          <label class="block text-xs font-medium text-zinc-700 mb-1.5">Username</label>
+          <input id="loginUsername" type="text" placeholder="admin" required
+            class="w-full border border-zinc-200 rounded-xl px-3.5 py-2.5 text-sm bg-zinc-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-zinc-700 mb-1.5">Password</label>
+          <input id="loginPassword" type="password" placeholder="••••••••" required
+            class="w-full border border-zinc-200 rounded-xl px-3.5 py-2.5 text-sm bg-zinc-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" />
+        </div>
+        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2.5 rounded-xl shadow-xs transition cursor-pointer">
+          Masuk ke Dashboard
+        </button>
+      </form>
+
+      <div class="mt-4 bg-zinc-50 border border-zinc-200/70 rounded-xl px-3 py-2 text-[11px] text-zinc-500 flex items-center justify-between">
+        <span>Akun default:</span>
+        <code class="text-zinc-700 font-medium">admin / admin123</code>
+      </div>
+
+      <div class="mt-5 pt-4 border-t border-zinc-100 text-center">
+        <a href="/" class="text-xs text-zinc-500 hover:text-indigo-600 transition font-medium">← Kembali ke Halaman Chatbot</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Dashboard Layout (Sidebar + Main) -->
+  <section id="dashboardSection" class="hidden min-h-screen flex flex-col md:flex-row">
+    <!-- Sidebar -->
+    <aside class="w-full md:w-64 bg-white border-b md:border-b-0 md:border-r border-zinc-200/80 flex flex-col shrink-0">
+      <div class="h-14 px-5 flex items-center justify-between border-b border-zinc-100">
+        <div class="flex items-center gap-2.5">
+          <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 text-white flex items-center justify-center shadow-xs">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+          </div>
+          <span class="text-sm font-semibold tracking-tight text-zinc-900">Admin Panel</span>
+        </div>
+        <a href="/" title="Buka Website Chatbot" class="text-zinc-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-zinc-100 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+          </svg>
+        </a>
+      </div>
+
+      <nav class="p-3 space-y-1 flex-1">
+        <div class="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">Navigasi</div>
+        
+        <button type="button" onclick="switchAdminTab('documents')" id="tabDocsNav" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium bg-indigo-50/80 text-indigo-700 transition cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+          Knowledge Base
+        </button>
+
+        <button type="button" onclick="switchAdminTab('roles')" id="tabRolesNav" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-zinc-600 hover:bg-zinc-100/80 hover:text-zinc-900 transition cursor-pointer">
+          <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+          </svg>
+          Manajemen Role (RBAC)
+        </button>
+
+        <button type="button" onclick="openChatModal()" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-zinc-600 hover:bg-zinc-100/80 hover:text-zinc-900 transition cursor-pointer">
+          <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+          </svg>
+          Buka Chatbot Uji Coba
+        </button>
+
+        <button type="button" onclick="openQuotaModal()" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-zinc-600 hover:bg-zinc-100/80 hover:text-zinc-900 transition cursor-pointer">
+          <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          Kuota Groq API
+        </button>
+      </nav>
+
+      <div class="p-3 border-t border-zinc-100 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2 min-w-0">
+          <div class="w-7 h-7 rounded-full bg-zinc-900 text-white text-[11px] font-semibold flex items-center justify-center shrink-0">A</div>
+          <div class="min-w-0">
+            <div class="text-xs font-medium text-zinc-800 truncate">Admin SSC</div>
+            <div class="text-[10px] text-emerald-600 font-medium">● Online</div>
+          </div>
+        </div>
+        <button id="logoutBtn" class="text-xs font-medium text-zinc-500 hover:text-red-600 px-2 py-1 rounded-lg hover:bg-red-50 transition cursor-pointer">
+          Logout
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 p-5 sm:p-8 max-w-6xl w-full space-y-6">
+
+      <!-- View: Documents (Default) -->
+      <div id="viewDocuments" class="space-y-6">
+        <div>
+          <h1 class="text-xl font-semibold tracking-tight text-zinc-900">Knowledge Base</h1>
+          <p class="text-xs text-zinc-500 mt-0.5">Unggah, atur role hak akses, dan kelola dokumen referensi untuk Chatbot RAG.</p>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="bg-white border border-zinc-200/80 rounded-2xl p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)] flex items-center justify-between">
+            <div>
+              <div class="text-xs font-medium text-zinc-500">Total Dokumen</div>
+              <div id="statDocs" class="text-2xl font-semibold text-zinc-900 mt-1">0</div>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+          </div>
+
+          <div class="bg-white border border-zinc-200/80 rounded-2xl p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)] flex items-center justify-between">
+            <div>
+              <div class="text-xs font-medium text-zinc-500">Chunks Terindeks</div>
+              <div id="statChunks" class="text-2xl font-semibold text-zinc-900 mt-1">0</div>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+              </svg>
+            </div>
+          </div>
+
+          <div class="bg-white border border-zinc-200/80 rounded-2xl p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)] flex items-center justify-between">
+            <div>
+              <div class="text-xs font-medium text-zinc-500">Role Terdaftar</div>
+              <div id="statRoles" class="text-2xl font-semibold text-zinc-900 mt-1">0</div>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Upload & Documents Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <!-- Left: Upload Form -->
+          <div class="lg:col-span-5 bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)] h-fit">
+            <h2 class="text-sm font-semibold text-zinc-900">Upload Dokumen RAG (RBAC)</h2>
+            <p class="text-xs text-zinc-500 mt-0.5 mb-4">Pilih role mana saja yang berhak mengakses dokumen ini.</p>
+
+            <div id="uploadMsg" class="hidden mb-4 text-xs rounded-xl p-3"></div>
+
+            <form id="uploadForm" class="space-y-4">
+              <div>
+                <label class="block text-xs font-medium text-zinc-700 mb-1.5">Judul Dokumen (opsional)</label>
+                <input id="docTitle" type="text" placeholder="Misal: Pedoman TAK 2025"
+                  class="w-full border border-zinc-200 rounded-xl px-3.5 py-2 text-sm bg-zinc-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" />
+              </div>
+
+              <!-- Custom Dropzone -->
+              <div>
+                <label class="block text-xs font-medium text-zinc-700 mb-1.5">File Dokumen (PDF, DOCX, TXT, XLSX, CSV)</label>
+                <label for="docFile" class="flex flex-col items-center justify-center border-2 border-dashed border-zinc-200 hover:border-indigo-400 bg-zinc-50/60 hover:bg-indigo-50/30 rounded-xl p-5 cursor-pointer transition text-center">
+                  <svg class="w-6 h-6 text-zinc-400 mb-1.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  <span id="fileLabel" class="text-xs font-medium text-zinc-600">Klik untuk pilih file dokumen</span>
+                  <input id="docFile" type="file" accept=".pdf,.docx,.xlsx,.txt,.md,.csv" required class="hidden" />
+                </label>
+              </div>
+
+              <!-- Role Selector Checkboxes (Tugas 1 & 2 Modul) -->
+              <div>
+                <label class="block text-xs font-medium text-zinc-700 mb-1.5">Hak Akses Role (RBAC)</label>
+                <div id="rolesCheckboxes" class="space-y-1.5 bg-zinc-50/60 border border-zinc-200 rounded-xl p-3 max-h-36 overflow-y-auto">
+                  <div class="text-xs text-zinc-400">Memuat role...</div>
+                </div>
+              </div>
+
+              <button id="uploadBtn" type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-medium px-5 py-2.5 rounded-xl shadow-xs transition cursor-pointer">
+                Upload &amp; Indeks Dokumen
+              </button>
+            </form>
+          </div>
+
+          <!-- Right: Document List -->
+          <div class="lg:col-span-7 bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="text-sm font-semibold text-zinc-900">Daftar Dokumen Terindeks</h2>
+              <button type="button" onclick="loadDocuments()" class="text-xs text-indigo-600 hover:underline font-medium">Refresh</button>
+            </div>
+            <div id="docList" class="divide-y divide-zinc-100"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- View: Role Management (Tugas 1 Modul) -->
+      <div id="viewRoles" class="hidden space-y-6">
+        <div>
+          <h1 class="text-xl font-semibold tracking-tight text-zinc-900">Manajemen Role (RBAC)</h1>
+          <p class="text-xs text-zinc-500 mt-0.5">Kelola role pengguna (Mahasiswa, Dosen, dll) untuk membatasi dokumen yang dapat diakses oleh AI Chatbot.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <!-- Form Create Role -->
+          <div class="lg:col-span-5 bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)] h-fit">
+            <h2 class="text-sm font-semibold text-zinc-900 mb-1">Tambah Role Baru</h2>
+            <p class="text-xs text-zinc-500 mb-4">Buat role baru untuk memisahkan hak akses dokumen khusus.</p>
+
+            <form id="createRoleForm" class="space-y-3.5">
+              <div>
+                <label class="block text-xs font-medium text-zinc-700 mb-1">Nama Role</label>
+                <input id="newRoleName" type="text" placeholder="misal: dosen, kaprodi" required
+                  class="w-full border border-zinc-200 rounded-xl px-3.5 py-2 text-sm bg-zinc-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-zinc-700 mb-1">Deskripsi Role</label>
+                <textarea id="newRoleDesc" rows="3" placeholder="Jelaskan cakupan akses role ini..."
+                  class="w-full border border-zinc-200 rounded-xl px-3.5 py-2 text-sm bg-zinc-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"></textarea>
+              </div>
+              <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium py-2.5 rounded-xl shadow-xs transition cursor-pointer">
+                Simpan Role Baru
+              </button>
+            </form>
+          </div>
+
+          <!-- Role List Table -->
+          <div class="lg:col-span-7 bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+            <h2 class="text-sm font-semibold text-zinc-900 mb-3">Daftar Role Aktif</h2>
+            <div id="rolesListTable" class="divide-y divide-zinc-100"></div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </section>
+
+  <script>
+    const loginSection = document.getElementById("loginSection");
+    const dashboardSection = document.getElementById("dashboardSection");
+    const loginForm = document.getElementById("loginForm");
+    const loginError = document.getElementById("loginError");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const docList = document.getElementById("docList");
+    const uploadMsg = document.getElementById("uploadMsg");
+    const docFileInput = document.getElementById("docFile");
+    const fileLabel = document.getElementById("fileLabel");
+    const toast = document.getElementById("toast");
+    const toastText = document.getElementById("toastText");
+    let availableRoles = [];
+
+    docFileInput.addEventListener("change", () => {
+      if (docFileInput.files && docFileInput.files[0]) {
+        const f = docFileInput.files[0];
+        fileLabel.textContent = `${f.name} (${Math.round(f.size / 1024)} KB)`;
+        fileLabel.classList.add("text-indigo-700");
+      } else {
+        fileLabel.textContent = "Klik untuk pilih file dokumen";
+        fileLabel.classList.remove("text-indigo-700");
+      }
+    });
+
+    function getToken() {
+      return localStorage.getItem("admin_token") || "";
+    }
+
+    function showToast(msg) {
+      toastText.textContent = msg;
+      toast.classList.remove("hidden");
+      setTimeout(() => toast.classList.add("hidden"), 2800);
+    }
+
+    function escapeHtml(str) {
+      return String(str || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    // Tab switcher between Documents and Roles
+    window.switchAdminTab = function (tab) {
+      const viewDocs = document.getElementById("viewDocuments");
+      const viewRoles = document.getElementById("viewRoles");
+      const tabDocsNav = document.getElementById("tabDocsNav");
+      const tabRolesNav = document.getElementById("tabRolesNav");
+
+      if (tab === "roles") {
+        viewDocs.classList.add("hidden");
+        viewRoles.classList.remove("hidden");
+        tabRolesNav.className = "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium bg-indigo-50/80 text-indigo-700 transition cursor-pointer";
+        tabDocsNav.className = "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-zinc-600 hover:bg-zinc-100/80 hover:text-zinc-900 transition cursor-pointer";
+        loadRolesTable();
+      } else {
+        viewDocs.classList.remove("hidden");
+        viewRoles.classList.add("hidden");
+        tabDocsNav.className = "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium bg-indigo-50/80 text-indigo-700 transition cursor-pointer";
+        tabRolesNav.className = "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-zinc-600 hover:bg-zinc-100/80 hover:text-zinc-900 transition cursor-pointer";
+        loadDocuments();
+      }
+    };
+
+    async function checkAuth() {
+      const token = getToken();
+      if (!token) return showLogin();
+      try {
+        const res = await fetch("/api/auth/me", { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        if (!data.user || (!data.user.is_admin && data.user.role !== "admin")) throw new Error();
+        showDashboard();
+      } catch {
+        localStorage.removeItem("admin_token");
+        showLogin();
+      }
+    }
+
+    function showLogin() {
+      loginSection.classList.remove("hidden");
+      dashboardSection.classList.add("hidden");
+    }
+
+    function showDashboard() {
+      loginSection.classList.add("hidden");
+      dashboardSection.classList.remove("hidden");
+      loadRoles();
+      loadDocuments();
+    }
+
+    loginForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      loginError.classList.add("hidden");
+      const username = document.getElementById("loginUsername").value.trim();
+      const password = document.getElementById("loginPassword").value;
+
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        loginError.textContent = data.detail || "Login gagal.";
+        loginError.classList.remove("hidden");
+        return;
+      }
+      if (!data.user || (!data.user.is_admin && data.user.role !== "admin")) {
+        loginError.textContent = "Akun Anda bukan Administrator.";
+        loginError.classList.remove("hidden");
+        return;
+      }
+      localStorage.setItem("admin_token", data.token);
+      showDashboard();
+    });
+
+    logoutBtn.addEventListener("click", () => {
+      localStorage.removeItem("admin_token");
+      window.location.href = "/";
+    });
+
+    // Roles Loading & Rendering
+    async function loadRoles() {
+      try {
+        const res = await fetch("/api/roles");
+        const data = await res.json();
+        availableRoles = data.roles || [];
+        document.getElementById("statRoles").textContent = availableRoles.length;
+
+        const container = document.getElementById("rolesCheckboxes");
+        if (availableRoles.length === 0) {
+          container.innerHTML = `<div class="text-xs text-zinc-400">Tidak ada role terdaftar.</div>`;
+          return;
+        }
+
+        container.innerHTML = availableRoles.map((r) => `
+          <label class="flex items-center gap-2 cursor-pointer text-xs text-zinc-700">
+            <input type="checkbox" name="role_cb" value="${r.id}" checked class="rounded text-indigo-600 focus:ring-indigo-500">
+            <span class="font-medium">${escapeHtml(r.name.toUpperCase())}</span>
+            <span class="text-zinc-400 text-[10px]">(${escapeHtml(r.description || 'Umum')})</span>
+          </label>
+        `).join("");
+      } catch {
+        document.getElementById("rolesCheckboxes").innerHTML = `<div class="text-xs text-red-500">Gagal memuat role.</div>`;
+      }
+    }
+
+    async function loadRolesTable() {
+      const container = document.getElementById("rolesListTable");
+      container.innerHTML = `<div class="text-xs text-zinc-400 py-6 text-center">Memuat role...</div>`;
+      await loadRoles();
+
+      if (availableRoles.length === 0) {
+        container.innerHTML = `<div class="text-xs text-zinc-500 py-6 text-center">Belum ada role.</div>`;
+        return;
+      }
+
+      container.innerHTML = availableRoles.map((r) => `
+        <div class="flex items-center justify-between py-3.5 first:pt-0 last:pb-0 gap-3">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-semibold text-zinc-900">${escapeHtml(r.name.toUpperCase())}</span>
+              <span class="text-[11px] px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-medium">${r.document_count || 0} Dokumen</span>
+            </div>
+            <p class="text-xs text-zinc-500 mt-0.5">${escapeHtml(r.description || 'Tidak ada deskripsi.')}</p>
+          </div>
+          ${r.name.toLowerCase() === "mahasiswa" || r.name.toLowerCase() === "admin"
+            ? '<span class="text-xs text-zinc-400 font-medium px-2 py-1">Role Dasar</span>'
+            : `<button type="button" onclick="deleteRole(${r.id}, '${escapeHtml(r.name)}')" class="text-xs text-red-600 hover:bg-red-50 font-medium px-2.5 py-1.5 rounded-lg transition cursor-pointer">Hapus</button>`
+          }
+        </div>
+      `).join("");
+    }
+
+    document.getElementById("createRoleForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = document.getElementById("newRoleName").value.trim();
+      const desc = document.getElementById("newRoleDesc").value.trim();
+
+      try {
+        const res = await fetch("/api/roles", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${getToken()}`,
+          },
+          body: JSON.stringify({ name, description: desc }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.detail || "Gagal membuat role.");
+          return;
+        }
+        showToast(`Role '${name}' berhasil dibuat!`);
+        document.getElementById("createRoleForm").reset();
+        loadRolesTable();
+      } catch {
+        alert("Gagal menghubungi server.");
+      }
+    });
+
+    window.deleteRole = async function (id, name) {
+      if (!confirm(`Hapus role '${name}'? Dokumen terkait tidak akan lagi memiliki hak akses ke role ini.`)) return;
+      try {
+        const res = await fetch(`/api/roles/${id}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        if (res.ok) {
+          showToast(`Role '${name}' dihapus.`);
+          loadRolesTable();
+        } else {
+          const data = await res.json();
+          alert(data.detail || "Gagal menghapus role.");
+        }
+      } catch {
+        alert("Koneksi gagal.");
+      }
+    };
+
+    // Document Management
+    async function loadDocuments() {
+      const res = await fetch("/api/documents", {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      const data = await res.json();
+      const docs = data.documents || [];
+      document.getElementById("statDocs").textContent = docs.length;
+      document.getElementById("statChunks").textContent = docs.reduce((acc, d) => acc + (d.total_chunks || 0), 0);
+
+      docList.innerHTML = docs.length === 0
+        ? `<div class="py-12 text-center text-xs text-zinc-500">Belum ada dokumen yang diunggah.</div>`
+        : docs.map((d) => {
+            const isActive = d.is_active !== 0;
+            const fileBadge = `<span class="text-[11px] bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-md font-medium">${escapeHtml(d.file_type.toUpperCase())}</span>`;
+            const statusBadge = isActive
+              ? ""
+              : `<span class="text-[11px] bg-amber-50 text-amber-700 border border-amber-200/80 px-2 py-0.5 rounded-md font-medium">Nonaktif</span>`;
+            
+            const rolesBadges = (d.roles || []).map(r => 
+              `<span class="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-700 border border-zinc-200">${escapeHtml(r.name.toUpperCase())}</span>`
+            ).join(" ");
+
+            const toggleLabel = isActive ? "Nonaktifkan" : "Aktifkan";
+            const toggleCls = isActive
+              ? "text-xs text-amber-600 hover:bg-amber-50 font-medium px-2.5 py-1.5 rounded-lg transition cursor-pointer"
+              : "text-xs text-emerald-600 hover:bg-emerald-50 font-medium px-2.5 py-1.5 rounded-lg transition cursor-pointer";
+            
+            return `
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-3.5 first:pt-0 last:pb-0 ${isActive ? "" : "opacity-60"}">
+                <div class="min-w-0 flex-1">
+                  <button type="button" onclick="viewChunks(${d.id})" class="text-left text-sm font-semibold text-zinc-900 hover:text-indigo-600 transition cursor-pointer break-words">
+                    ${escapeHtml(d.title)}
+                  </button>
+                  <div class="text-xs text-zinc-500 mt-0.5">${d.total_chunks} chunks</div>
+                  <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                    ${fileBadge}${statusBadge}
+                    <div class="flex items-center gap-1">${rolesBadges}</div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <button type="button" onclick="viewChunks(${d.id})" class="text-xs text-indigo-600 hover:bg-indigo-50 font-medium px-2.5 py-1.5 rounded-lg transition cursor-pointer">
+                    Lihat Chunks
+                  </button>
+                  <button type="button" onclick="toggleDocument(${d.id})" class="${toggleCls}">
+                    ${toggleLabel}
+                  </button>
+                  <button type="button" onclick="deleteDocument(${d.id}, '${escapeHtml(d.title)}')" class="text-xs text-red-600 hover:bg-red-50 font-medium px-2.5 py-1.5 rounded-lg transition cursor-pointer">
+                    Hapus
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join("");
+    }
+
+    document.getElementById("uploadForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      uploadMsg.classList.add("hidden");
+
+      const checkedRoles = Array.from(document.querySelectorAll("input[name='role_cb']:checked")).map(cb => parseInt(cb.value));
+      if (checkedRoles.length === 0) {
+        alert("Pilih minimal satu role untuk hak akses dokumen ini.");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", docFileInput.files[0]);
+      formData.append("title", document.getElementById("docTitle").value.trim());
+      formData.append("role_ids", JSON.stringify(checkedRoles));
+
+      const btn = document.getElementById("uploadBtn");
+      btn.disabled = true;
+      btn.textContent = "Memproses Ekstraksi & Chunking...";
+
+      try {
+        const res = await fetch("/api/documents/upload", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${getToken()}` },
+          body: formData,
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          uploadMsg.className = "mb-4 text-xs rounded-xl p-3 bg-red-50 text-red-700 border border-red-200";
+          uploadMsg.textContent = data.detail || "Gagal mengunggah dokumen.";
+        } else {
+          uploadMsg.className = "mb-4 text-xs rounded-xl p-3 bg-emerald-50 text-emerald-700 border border-emerald-200";
+          uploadMsg.textContent = data.message;
+          document.getElementById("uploadForm").reset();
+          loadRoles();
+          fileLabel.textContent = "Klik untuk pilih file dokumen";
+          fileLabel.classList.remove("text-indigo-700");
+          loadDocuments();
+        }
+        uploadMsg.classList.remove("hidden");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Upload & Indeks Dokumen";
+      }
+    });
+
+    window.toggleDocument = async function (id) {
+      const res = await fetch(`/api/documents/${id}/toggle`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (res.ok) loadDocuments();
+    };
+
+    window.deleteDocument = async function (id, title) {
+      if (!confirm(`Hapus dokumen '${title}' beserta seluruh chunks terkait?`)) return;
+      const res = await fetch(`/api/documents/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (res.ok) {
+        showToast(`Dokumen '${title}' dihapus`);
+        loadDocuments();
+      }
+    };
+
+    window.viewChunks = async function (docId) {
+      const modal = document.getElementById("chunksModal");
+      const titleEl = document.getElementById("modalDocTitle");
+      const metaEl = document.getElementById("modalDocMeta");
+      const listEl = document.getElementById("modalChunksList");
+
+      titleEl.textContent = "Memuat chunks...";
+      metaEl.textContent = "";
+      listEl.innerHTML = `<div class="text-xs text-zinc-500 py-8 text-center">Mengambil data chunk...</div>`;
+      modal.classList.remove("hidden");
+
+      try {
+        const res = await fetch(`/api/documents/${docId}/chunks`, {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          listEl.innerHTML = `<div class="text-xs text-red-600 py-8 text-center">${escapeHtml(data.detail || "Gagal memuat chunks.")}</div>`;
+          return;
+        }
+        const doc = data.document;
+        const chunks = data.chunks || [];
+        titleEl.textContent = doc.title;
+        metaEl.textContent = `${doc.file_type.toUpperCase()} · ${chunks.length} chunks`;
+        listEl.innerHTML = chunks.length === 0
+          ? `<div class="text-xs text-zinc-500 py-8 text-center">Tidak ada chunk pada dokumen ini.</div>`
+          : chunks.map((c) => `
+              <div class="bg-white border border-zinc-200/80 rounded-xl p-3.5 shadow-xs">
+                <div class="text-[11px] font-semibold text-indigo-600 mb-1.5">Chunk #${c.chunk_index + 1}</div>
+                <div class="text-xs text-zinc-700 leading-relaxed break-words [overflow-wrap:anywhere]">${escapeHtml(c.text)}</div>
+              </div>
+            `).join("");
+      } catch {
+        listEl.innerHTML = `<div class="text-xs text-red-600 py-8 text-center">Gagal terhubung ke server.</div>`;
+      }
+    };
+
+    window.closeChunksModal = function () {
+      document.getElementById("chunksModal").classList.add("hidden");
+    };
+
+    // Chat Test Modal
+    window.openChatModal = function () {
+      document.getElementById("chatModal").classList.remove("hidden");
+      setTimeout(() => document.getElementById("adminQuestionInput").focus(), 50);
+    };
+
+    window.closeChatModal = function () {
+      document.getElementById("chatModal").classList.add("hidden");
+    };
+
+    window.clearAdminChat = function () {
+      document.getElementById("adminChatBox").innerHTML = `
+        <div class="bg-white border border-zinc-200/80 rounded-xl p-5 text-center my-6">
+          <p class="text-xs font-medium text-zinc-700">Percakapan Dibersihkan</p>
+          <p class="text-[11px] text-zinc-400 mt-1">Silakan ajukan pertanyaan baru.</p>
+        </div>
+      `;
+    };
+
+    document.getElementById("adminChatForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const question = document.getElementById("adminQuestionInput").value.trim();
+      const role = document.getElementById("adminChatRole").value;
+      if (!question) return;
+
+      const chatBox = document.getElementById("adminChatBox");
+      const userDiv = document.createElement("div");
+      userDiv.className = "flex justify-end";
+      userDiv.innerHTML = `
+        <div class="bg-zinc-900 text-white rounded-2xl rounded-br-md px-3.5 py-2.5 max-w-[85%] shadow-xs">
+          <p class="text-xs leading-relaxed whitespace-pre-wrap">${escapeHtml(question)}</p>
+        </div>
+      `;
+      chatBox.appendChild(userDiv);
+      document.getElementById("adminQuestionInput").value = "";
+      chatBox.scrollTop = chatBox.scrollHeight;
+
+      const loadingDiv = document.createElement("div");
+      loadingDiv.className = "flex justify-start";
+      loadingDiv.innerHTML = `
+        <div class="bg-white border border-zinc-200/80 rounded-2xl rounded-bl-md px-3.5 py-2.5 text-xs text-zinc-500 shadow-xs">
+          <span>Menyusun jawaban untuk role '${role}'...</span>
+        </div>
+      `;
+      chatBox.appendChild(loadingDiv);
+      chatBox.scrollTop = chatBox.scrollHeight;
+
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question, role }),
+        });
+        const data = await res.json();
+        loadingDiv.remove();
+
+        const botDiv = document.createElement("div");
+        botDiv.className = "flex justify-start items-start gap-2";
+
+        let sourcesHtml = "";
+        if (data.sources && data.sources.length > 0) {
+          const chips = data.sources.map(s => `
+            <span class="inline-flex items-center gap-1 text-[11px] bg-zinc-50 text-zinc-700 px-2 py-1 rounded-lg border border-zinc-200">
+              <span class="font-medium truncate max-w-[160px]">${escapeHtml(s.title)}</span>
+              <span class="text-[10px] text-zinc-400 font-mono">${Math.round(s.score * 100)}%</span>
+            </span>
+          `).join("");
+          sourcesHtml = `<div class="mt-2 pt-2 border-t border-zinc-100 flex flex-wrap gap-1">${chips}</div>`;
+        }
+
+        botDiv.innerHTML = `
+          <div class="w-6 h-6 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">R</div>
+          <div class="bg-white border border-zinc-200/80 rounded-2xl rounded-tl-md p-3.5 max-w-[85%] text-xs text-zinc-800 leading-relaxed shadow-xs">
+            <div class="font-medium mb-1 text-[10px] text-indigo-600 uppercase tracking-wide">Akses Role: ${escapeHtml(data.role || role)}</div>
+            <div>${escapeHtml(data.answer)}</div>
+            ${sourcesHtml}
+          </div>
+        `;
+        chatBox.appendChild(botDiv);
+      } catch {
+        loadingDiv.remove();
+        const errDiv = document.createElement("div");
+        errDiv.className = "text-xs text-red-500 py-2";
+        errDiv.textContent = "Gagal memproses pertanyaan.";
+        chatBox.appendChild(errDiv);
+      }
+      chatBox.scrollTop = chatBox.scrollHeight;
+    });
+
+    // Groq Quota Tracking Modal
+    window.openQuotaModal = function () {
+      document.getElementById("quotaModal").classList.remove("hidden");
+      loadGroqQuota();
+    };
+
+    window.closeQuotaModal = function () {
+      document.getElementById("quotaModal").classList.add("hidden");
+    };
+
+    window.loadGroqQuota = async function () {
+      const contentEl = document.getElementById("quotaContent");
+      const infoEl = document.getElementById("quotaModelInfo");
+      contentEl.innerHTML = '<div class="text-center text-xs text-zinc-400 py-8">Memuat data kuota...</div>';
+
+      try {
+        const res = await fetch("/api/admin/groq-quota", {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          contentEl.innerHTML = `<div class="text-center text-xs text-red-600 py-6">${escapeHtml(data.detail || "Gagal memuat kuota.")}</div>`;
+          return;
+        }
+
+        const activeModel = (data.latest && data.latest.model) || data.configured_model;
+        infoEl.textContent = `Model: ${activeModel} • ${data.has_api_key ? "API Key Aktif" : "API Key Belum Diatur"}`;
+
+        const latest = data.latest;
+        const reqLimit = latest && latest.limit_requests ? latest.limit_requests : 0;
+        const reqRem = latest && latest.remaining_requests != null ? latest.remaining_requests : 0;
+        const reqPct = reqLimit > 0 ? Math.min(100, Math.round((reqRem / reqLimit) * 100)) : 0;
+
+        const tokLimit = latest && latest.limit_tokens ? latest.limit_tokens : 0;
+        const tokRem = latest && latest.remaining_tokens != null ? latest.remaining_tokens : 0;
+        const tokPct = tokLimit > 0 ? Math.min(100, Math.round((tokRem / tokLimit) * 100)) : 0;
+
+        const rateLimitHtml = latest
+          ? `
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div class="bg-white border border-zinc-200/80 rounded-xl p-4">
+                <div class="flex items-center justify-between text-xs font-medium text-zinc-600">
+                  <span>Sisa Request (RPD)</span>
+                  <span class="text-zinc-900 font-semibold">${reqRem.toLocaleString("id-ID")} / ${reqLimit.toLocaleString("id-ID")}</span>
+                </div>
+                <div class="w-full h-2 bg-zinc-100 rounded-full overflow-hidden mt-2.5">
+                  <div class="h-full ${reqPct > 25 ? "bg-indigo-600" : "bg-amber-500"} rounded-full transition-all" style="width: ${reqPct}%"></div>
+                </div>
+                <div class="flex items-center justify-between text-[11px] text-zinc-400 mt-2">
+                  <span>${reqPct}% tersisa</span>
+                  <span>Reset: ${escapeHtml(latest.reset_requests_label || latest.reset_requests || "-")}</span>
+                </div>
+              </div>
+
+              <div class="bg-white border border-zinc-200/80 rounded-xl p-4">
+                <div class="flex items-center justify-between text-xs font-medium text-zinc-600">
+                  <span>Sisa Token (TPM)</span>
+                  <span class="text-zinc-900 font-semibold">${tokRem.toLocaleString("id-ID")} / ${tokLimit.toLocaleString("id-ID")}</span>
+                </div>
+                <div class="w-full h-2 bg-zinc-100 rounded-full overflow-hidden mt-2.5">
+                  <div class="h-full ${tokPct > 25 ? "bg-emerald-500" : "bg-amber-500"} rounded-full transition-all" style="width: ${tokPct}%"></div>
+                </div>
+                <div class="flex items-center justify-between text-[11px] text-zinc-400 mt-2">
+                  <span>${tokPct}% tersisa</span>
+                  <span>Reset: ${escapeHtml(latest.reset_tokens_label || latest.reset_tokens || "-")}</span>
+                </div>
+              </div>
+            </div>
+          `
+          : `
+            <div class="bg-amber-50 border border-amber-200/80 rounded-xl p-4 text-xs text-amber-800">
+              Belum ada request ke Groq API yang tercatat. Kirim minimal 1 pertanyaan di chatbot untuk melihat sisa kuota real-time dari header Groq.
+            </div>
+          `;
+
+        const statsHtml = `
+          <div class="grid grid-cols-3 gap-3">
+            <div class="bg-white border border-zinc-200/80 rounded-xl p-3.5">
+              <div class="text-[11px] text-zinc-500">Request Hari Ini</div>
+              <div class="text-lg font-semibold text-zinc-900 mt-0.5">${(data.today.requests_today || 0).toLocaleString("id-ID")}</div>
+            </div>
+            <div class="bg-white border border-zinc-200/80 rounded-xl p-3.5">
+              <div class="text-[11px] text-zinc-500">Token Hari Ini</div>
+              <div class="text-lg font-semibold text-zinc-900 mt-0.5">${(data.today.total_tokens_today || 0).toLocaleString("id-ID")}</div>
+            </div>
+            <div class="bg-white border border-zinc-200/80 rounded-xl p-3.5">
+              <div class="text-[11px] text-zinc-500">Total Request</div>
+              <div class="text-lg font-semibold text-zinc-900 mt-0.5">${(data.total.total_requests || 0).toLocaleString("id-ID")}</div>
+            </div>
+          </div>
+        `;
+
+        const logs = data.recent_logs || [];
+        const logsHtml = logs.length === 0
+          ? `<div class="text-center text-xs text-zinc-400 py-5">Belum ada riwayat pemanggilan Groq API.</div>`
+          : `
+            <div class="bg-white border border-zinc-200/80 rounded-xl overflow-hidden">
+              <div class="px-4 py-2.5 border-b border-zinc-100 text-xs font-semibold text-zinc-800">10 Request Terakhir</div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                  <thead class="bg-zinc-50 border-b border-zinc-100 text-[11px] text-zinc-500">
+                    <tr>
+                      <th class="px-3.5 py-2 font-medium">Waktu</th>
+                      <th class="px-3.5 py-2 font-medium">Model</th>
+                      <th class="px-3.5 py-2 font-medium">Token</th>
+                      <th class="px-3.5 py-2 font-medium">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-zinc-100">
+                    ${logs.map((l) => {
+                      const dt = new Date(l.created_at).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+                      const badge = l.status === "success"
+                        ? '<span class="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200/70 px-1.5 py-0.5 rounded font-medium">Sukses</span>'
+                        : '<span class="text-[10px] bg-red-50 text-red-700 border border-red-200/70 px-1.5 py-0.5 rounded font-medium">Error</span>';
+                      return `
+                        <tr>
+                          <td class="px-3.5 py-2 text-zinc-500 whitespace-nowrap">${escapeHtml(dt)}</td>
+                          <td class="px-3.5 py-2 text-zinc-800 font-mono text-[11px]">${escapeHtml(l.model)}</td>
+                          <td class="px-3.5 py-2 text-zinc-700 whitespace-nowrap">${(l.total_tokens || 0).toLocaleString("id-ID")}</td>
+                          <td class="px-3.5 py-2 whitespace-nowrap">${badge}</td>
+                        </tr>
+                      `;
+                    }).join("")}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          `;
+
+        contentEl.innerHTML = rateLimitHtml + statsHtml + logsHtml;
+      } catch {
+        contentEl.innerHTML = '<div class="text-center text-xs text-red-600 py-6">Gagal terhubung ke server.</div>';
+      }
+    };
+
+    checkAuth();
+  </script>
+</body>
+</html>

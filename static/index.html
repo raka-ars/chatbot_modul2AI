@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ChatGPT RAG — Asisten Dokumen Akademik Tel-U</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', 'sans-serif'] },
+          colors: {
+            gpt: {
+              sidebar: '#171717',
+              sidebarHover: '#212121',
+              chatBg: '#212121',
+              msgBg: '#2f2f2f',
+              border: '#333333',
+              accent: '#10a37f',
+              accentHover: '#1a7f64',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom scrollbar for modern sleek feel */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.25); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(156, 163, 175, 0.45); }
+    pre code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+  </style>
+</head>
+<body class="bg-[#212121] text-zinc-100 font-sans antialiased h-full overflow-hidden flex flex-col">
+
+  <!-- Main Container -->
+  <div class="flex-1 flex overflow-hidden relative">
+
+    <!-- Mobile Overlay -->
+    <div id="sidebarOverlay" onclick="toggleSidebar(false)" class="hidden fixed inset-0 z-30 bg-black/60 backdrop-blur-xs md:hidden"></div>
+
+    <!-- ChatGPT-style Left Sidebar -->
+    <aside id="chatSidebar" class="fixed md:static inset-y-0 left-0 z-40 w-72 bg-[#171717] border-r border-[#262626] flex flex-col transition-transform duration-300 -translate-x-full md:translate-x-0 shrink-0 select-none">
+      
+      <!-- Sidebar Header -->
+      <div class="p-3 flex items-center justify-between gap-2 border-b border-[#262626]">
+        <button type="button" onclick="createNewChat()" class="flex-1 flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-zinc-700/60 hover:bg-[#212121] text-zinc-200 hover:text-white transition group text-xs font-medium cursor-pointer">
+          <div class="flex items-center gap-2.5">
+            <div class="w-6 h-6 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+            </div>
+            <span>Chat Baru</span>
+          </div>
+          <span class="text-[10px] text-zinc-500 font-mono border border-zinc-700 px-1.5 py-0.5 rounded">Ctrl+K</span>
+        </button>
+
+        <button type="button" onclick="toggleSidebar(false)" class="md:hidden text-zinc-400 hover:text-white p-2 rounded-lg hover:bg-[#212121] transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Conversation History List -->
+      <div class="flex-1 overflow-y-auto p-2 space-y-1" id="conversationsList">
+        <div class="text-[11px] font-semibold text-zinc-500 uppercase px-3 py-2 tracking-wider">Riwayat Chat</div>
+        <div id="convLoading" class="text-xs text-zinc-500 px-3 py-4 text-center">Memuat riwayat...</div>
+      </div>
+
+      <!-- Sidebar User Footer -->
+      <div class="p-3 border-t border-[#262626] bg-[#141414]">
+        <div id="authProfileBox" class="flex items-center justify-between gap-2.5">
+          <!-- Diisi via JS (User info / Login button) -->
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Chat Workspace -->
+    <main class="flex-1 flex flex-col bg-[#212121] relative min-w-0 h-full">
+
+      <!-- Top Navigation Bar -->
+      <header class="h-14 border-b border-[#2d2d2d] bg-[#212121]/90 backdrop-blur-md px-4 flex items-center justify-between shrink-0 z-10">
+        <div class="flex items-center gap-3 min-w-0">
+          <button type="button" onclick="toggleSidebar()" class="text-zinc-400 hover:text-white p-1.5 rounded-lg hover:bg-zinc-800 transition cursor-pointer">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+            </svg>
+          </button>
+
+          <div class="flex items-center gap-2 min-w-0">
+            <div class="w-7 h-7 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+              AI
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <span id="headerChatTitle" class="text-sm font-semibold text-zinc-100 truncate">ChatGPT RAG · Layanan SSC</span>
+                <span id="roleBadge" class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-wide">
+                  Mahasiswa
+                </span>
+              </div>
+              <span class="text-[11px] text-zinc-400 block truncate">Model: Qwen 3.8 27B (Groq) · RBAC Active</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 shrink-0">
+          <a href="/admin" class="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700/80 transition cursor-pointer">
+            <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
+            </svg>
+            <span class="hidden sm:inline">Panel Admin</span>
+          </a>
+
+          <button id="authBtnTop" onclick="openAuthModal()" type="button" class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs transition cursor-pointer">
+            <span>Masuk / Daftar</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Chat Messages Scroll Container -->
+      <div id="messagesContainer" class="flex-1 overflow-y-auto px-4 sm:px-6 py-6 space-y-6">
+        
+        <!-- Welcome Hero Screen (Displayed when chat is empty) -->
+        <div id="welcomeScreen" class="max-w-2xl mx-auto my-auto py-8 text-center flex flex-col items-center justify-center">
+          <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-white flex items-center justify-center text-2xl font-bold shadow-lg shadow-emerald-500/20 mb-4 ring-4 ring-emerald-500/10">
+            ✦
+          </div>
+          <h1 class="text-xl sm:text-2xl font-bold text-white tracking-tight">Ada yang bisa saya bantu hari ini?</h1>
+          <p id="welcomeSubtext" class="text-xs sm:text-sm text-zinc-400 mt-2 max-w-lg leading-relaxed">
+            Asisten AI RAG dengan kontrol akses dokumen berbasis role (RBAC). Dapatkan jawaban akurat seputar TAK, operasional SSC, dan layanan akademik langsung beserta sumber dokumennya.
+          </p>
+
+          <!-- Quick Suggestion Cards -->
+          <div class="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3 w-full text-left">
+            <button type="button" onclick="sendQuickPrompt('Apa saja ketentuan dan nilai minimal TAK mahasiswa menurut SK TAK 2025?')" class="p-3.5 rounded-2xl border border-zinc-700/60 bg-[#262626]/80 hover:bg-[#2d2d2d] hover:border-emerald-500/50 transition group cursor-pointer">
+              <div class="text-xs font-semibold text-zinc-200 group-hover:text-emerald-400 flex items-center justify-between">
+                <span>Ketentuan SK TAK 2025</span>
+                <span class="text-zinc-500 text-[10px] group-hover:translate-x-0.5 transition">→</span>
+              </div>
+              <div class="text-[11px] text-zinc-400 mt-1">Nilai minimal kelulusan TAK &amp; aturan terbaru</div>
+            </button>
+
+            <button type="button" onclick="sendQuickPrompt('Apa saja perbedaan aturan TAK pada SK 2025 dibandingkan SK TAK 2022?')" class="p-3.5 rounded-2xl border border-zinc-700/60 bg-[#262626]/80 hover:bg-[#2d2d2d] hover:border-emerald-500/50 transition group cursor-pointer">
+              <div class="text-xs font-semibold text-zinc-200 group-hover:text-emerald-400 flex items-center justify-between">
+                <span>Perubahan SK TAK 2022 vs 2025</span>
+                <span class="text-zinc-500 text-[10px] group-hover:translate-x-0.5 transition">→</span>
+              </div>
+              <div class="text-[11px] text-zinc-400 mt-1">Komparasi poin pedoman TAK lama dan baru</div>
+            </button>
+
+            <button type="button" onclick="sendQuickPrompt('Kapan jam operasional layanan Student Service Center (SSC) Telkom University?')" class="p-3.5 rounded-2xl border border-zinc-700/60 bg-[#262626]/80 hover:bg-[#2d2d2d] hover:border-emerald-500/50 transition group cursor-pointer">
+              <div class="text-xs font-semibold text-zinc-200 group-hover:text-emerald-400 flex items-center justify-between">
+                <span>Jam Operasional Layanan SSC</span>
+                <span class="text-zinc-500 text-[10px] group-hover:translate-x-0.5 transition">→</span>
+              </div>
+              <div class="text-[11px] text-zinc-400 mt-1">Hari &amp; jam buka operasional SSC Tel-U</div>
+            </button>
+
+            <button type="button" onclick="sendQuickPrompt('Bagaimana alur dan kontak untuk menghubungi layanan SSC?')" class="p-3.5 rounded-2xl border border-zinc-700/60 bg-[#262626]/80 hover:bg-[#2d2d2d] hover:border-emerald-500/50 transition group cursor-pointer">
+              <div class="text-xs font-semibold text-zinc-200 group-hover:text-emerald-400 flex items-center justify-between">
+                <span>Alur Menghubungi SSC</span>
+                <span class="text-zinc-500 text-[10px] group-hover:translate-x-0.5 transition">→</span>
+              </div>
+              <div class="text-[11px] text-zinc-400 mt-1">WhatsApp, email, dan panduan tiket layanan</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Chat Messages Container -->
+        <div id="messagesList" class="max-w-3xl mx-auto space-y-6"></div>
+      </div>
+
+      <!-- Bottom Floating Composer -->
+      <div class="p-3 sm:p-4 bg-gradient-to-t from-[#212121] via-[#212121] to-transparent shrink-0">
+        <div class="max-w-3xl mx-auto">
+          <form id="chatInputForm" class="bg-[#2f2f2f] border border-zinc-700/80 rounded-3xl p-2 flex items-end gap-2 focus-within:border-zinc-500 shadow-xl transition">
+            <textarea
+              id="messageInput"
+              rows="1"
+              placeholder="Tanyakan dokumen akademik, TAK, atau operasional SSC..."
+              class="flex-1 bg-transparent text-sm text-zinc-100 placeholder:text-zinc-500 px-3.5 py-2 resize-none max-h-36 focus:outline-none leading-relaxed"
+              required
+            ></textarea>
+            <button
+              id="sendBtn"
+              type="submit"
+              class="w-8 h-8 rounded-full bg-white text-zinc-900 hover:bg-zinc-200 disabled:opacity-30 disabled:hover:bg-white flex items-center justify-center shrink-0 transition cursor-pointer shadow-xs"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" />
+              </svg>
+            </button>
+          </form>
+          <div class="text-[11px] text-zinc-500 text-center mt-2">
+            Jawaban didasarkan pada dokumen referensi sesuai hak akses role (RBAC). Selalu periksa kembali info penting ke unit terkait.
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Auth Modal (Login / Register gaya ChatGPT) -->
+  <div id="authModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-[#1e1e1e] border border-zinc-700/80 rounded-3xl shadow-2xl w-full max-w-md p-6 sm:p-7 overflow-hidden text-zinc-100 relative">
+      <button type="button" onclick="closeAuthModal()" class="absolute top-5 right-5 text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800 transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+
+      <!-- Logo & Title -->
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center font-bold text-lg shadow-sm">
+          ✦
+        </div>
+        <div>
+          <h2 class="text-lg font-bold text-white tracking-tight">Akun Pengguna</h2>
+          <p class="text-xs text-zinc-400">Masuk atau daftar untuk menyimpan riwayat chat</p>
+        </div>
+      </div>
+
+      <!-- Tabs: Login vs Register -->
+      <div class="flex border-b border-zinc-800 mb-5 text-xs font-semibold">
+        <button id="tabLoginBtn" type="button" onclick="switchAuthTab('login')" class="flex-1 py-2.5 text-center border-b-2 border-emerald-500 text-white transition">
+          Masuk (Login)
+        </button>
+        <button id="tabRegisterBtn" type="button" onclick="switchAuthTab('register')" class="flex-1 py-2.5 text-center border-b-2 border-transparent text-zinc-400 hover:text-white transition">
+          Daftar (Register)
+        </button>
+      </div>
+
+      <!-- Error / Alert Message -->
+      <div id="authAlert" class="hidden mb-4 p-3 rounded-xl text-xs bg-red-900/40 text-red-200 border border-red-800"></div>
+
+      <!-- Login Form -->
+      <form id="loginForm" class="space-y-3.5">
+        <div>
+          <label class="block text-xs font-medium text-zinc-300 mb-1">Username</label>
+          <input id="loginUsername" type="text" placeholder="Masukkan username" required
+            class="w-full bg-[#2a2a2a] border border-zinc-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 transition" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-zinc-300 mb-1">Password</label>
+          <input id="loginPassword" type="password" placeholder="••••••••" required
+            class="w-full bg-[#2a2a2a] border border-zinc-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 transition" />
+        </div>
+        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs py-2.5 rounded-xl shadow-xs transition cursor-pointer">
+          Masuk ke Akun
+        </button>
+      </form>
+
+      <!-- Register Form -->
+      <form id="registerForm" class="space-y-3 hidden">
+        <div>
+          <label class="block text-xs font-medium text-zinc-300 mb-1">Username</label>
+          <input id="regUsername" type="text" placeholder="misal: raka_aditya" required
+            class="w-full bg-[#2a2a2a] border border-zinc-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 transition" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-zinc-300 mb-1">Nama Lengkap</label>
+          <input id="regFullName" type="text" placeholder="misal: Raka Aditya Rifky" required
+            class="w-full bg-[#2a2a2a] border border-zinc-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 transition" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-zinc-300 mb-1">Pilih Role (RBAC Access)</label>
+          <select id="regRole" class="w-full bg-[#2a2a2a] border border-zinc-700 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition">
+            <option value="mahasiswa">Mahasiswa (Akses Dokumen Akademik &amp; SSC)</option>
+            <option value="dosen">Dosen (Akses Dokumen Akademik, SSC &amp; Pedoman Internal Dosen)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-zinc-300 mb-1">Password</label>
+          <input id="regPassword" type="password" placeholder="Minimal 6 karakter" required minlength="6"
+            class="w-full bg-[#2a2a2a] border border-zinc-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 transition" />
+        </div>
+        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs py-2.5 rounded-xl shadow-xs transition cursor-pointer">
+          Daftar Akun Baru
+        </button>
+      </form>
+
+      <!-- Fast Demo Logins -->
+      <div class="mt-5 pt-4 border-t border-zinc-800">
+        <div class="text-[11px] font-semibold text-zinc-400 mb-2">Akun Uji Coba Cepat (1-Klik):</div>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <button type="button" onclick="quickLogin('mahasiswa', 'mahasiswa123')" class="p-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 hover:text-white transition text-left cursor-pointer border border-zinc-700/60">
+            <div class="font-semibold text-emerald-400 text-[11px]">Mahasiswa</div>
+            <div class="text-[10px] text-zinc-400">mahasiswa / 123</div>
+          </button>
+          <button type="button" onclick="quickLogin('dosen', 'dosen123')" class="p-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 hover:text-white transition text-left cursor-pointer border border-zinc-700/60">
+            <div class="font-semibold text-sky-400 text-[11px]">Dosen (Internal)</div>
+            <div class="text-[10px] text-zinc-400">dosen / 123</div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Document Source Modal -->
+  <div id="sourceModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-[#1e1e1e] border border-zinc-700 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[82vh] flex flex-col overflow-hidden text-zinc-100">
+      <div class="px-5 py-4 border-b border-zinc-800 flex items-center justify-between gap-3">
+        <div class="min-w-0">
+          <h3 id="sourceModalTitle" class="text-sm font-semibold text-white truncate">Sumber Dokumen</h3>
+          <p id="sourceModalMeta" class="text-xs text-zinc-400 mt-0.5"></p>
+        </div>
+        <button type="button" onclick="closeSourceModal()" class="text-zinc-400 hover:text-white p-1.5 rounded-lg hover:bg-zinc-800 transition cursor-pointer">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div id="sourceModalBody" class="p-5 overflow-y-auto space-y-3 bg-[#171717] flex-1 text-xs leading-relaxed text-zinc-300 break-words [overflow-wrap:anywhere]"></div>
+      <div class="px-5 py-3 border-t border-zinc-800 bg-[#1e1e1e] flex items-center justify-between gap-2">
+        <a id="sourceModalDownload" href="#" download class="hidden text-xs font-semibold text-emerald-400 hover:text-emerald-300 px-3 py-1.5 rounded-lg hover:bg-zinc-800 transition">
+          Unduh File Asli
+        </a>
+        <button type="button" onclick="closeSourceModal()" class="ml-auto text-xs font-medium text-zinc-300 bg-zinc-800 hover:bg-zinc-700 px-4 py-2 rounded-xl transition cursor-pointer">
+          Tutup
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Application Script -->
+  <script>
+    const TOKEN_KEY = "chatgpt_rag_token";
+    const ACTIVE_CONV_KEY = "chatgpt_rag_active_conv";
+
+    let currentUser = null;
+    let activeConversationId = null;
+    let conversations = [];
+
+    // Markdown Parser
+    function escapeHtml(str) {
+      return String(str || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function cleanLatex(expr) {
+      return expr
+        .replace(/\\left\s*([(\[{|])/g, "$1")
+        .replace(/\\right\s*([)\]}|])/g, "$1")
+        .replace(/\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g, "$1 / $2")
+        .replace(/\\times/g, "×")
+        .replace(/\\div/g, "÷")
+        .replace(/\\cdot/g, "·")
+        .replace(/\\pm/g, "±")
+        .replace(/\\leq/g, "≤")
+        .replace(/\\geq/g, "≥")
+        .replace(/\\neq/g, "≠")
+        .replace(/\\approx/g, "≈")
+        .replace(/\\%/g, "%")
+        .replace(/_\{([^{}]+)\}/g, "$1")
+        .replace(/\^\{([^{}]+)\}/g, "^$1")
+        .replace(/\(\s+/g, "(")
+        .replace(/\s+\)/g, ")")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+    }
+
+    function formatMarkdown(text) {
+      const escaped = escapeHtml(text || "");
+      const lines = escaped.split(/\r?\n/);
+      let html = "";
+      let inUl = false;
+      let inOl = false;
+
+      function inlineFormat(s) {
+        const links = [];
+        const stashLink = (href, label, external = true) => {
+          const idx = links.length;
+          const attrs = external ? ' target="_blank" rel="noopener noreferrer"' : "";
+          links.push(`<a href="${href}"${attrs} class="text-emerald-400 hover:underline break-all">${label}</a>`);
+          return `\u0000LINK${idx}\u0000`;
+        };
+
+        let out = s
+          .replace(/\[([^\]]+)\]\(((?:https?:\/\/|mailto:)[^\s)]+)\)/g, (_, label, url) =>
+            stashLink(url, label, url.startsWith("http"))
+          )
+          .replace(/(^|[\s(>])(https?:\/\/[^\s<)]+)/g, (_, pre, url) => {
+            const cleanUrl = url.replace(/[.,;:!?]+$/, "");
+            const trail = url.slice(cleanUrl.length);
+            return pre + stashLink(cleanUrl, cleanUrl, true) + trail;
+          })
+          .replace(/(^|[\s(>])([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g, (_, pre, email) =>
+            pre + stashLink(`mailto:${email}`, email, false)
+          )
+          .replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold text-white">$1</strong>')
+          .replace(/(^|[^\*])\*([^*\n]+)\*/g, '$1$2')
+          .replace(/`([^`]+)`/g, '<code class="bg-[#1e1e1e] border border-zinc-700/60 text-emerald-300 px-1.5 py-0.5 rounded text-xs font-mono">$1</code>')
+          .replace(/\$\$([^$]+)\$\$/g, (_, math) => `<span class="font-mono text-xs font-medium text-emerald-300 bg-zinc-800 px-1.5 py-0.5 rounded">${cleanLatex(math)}</span>`)
+          .replace(/\$([^$\n]+)\$/g, (_, math) => `<span class="font-mono text-xs font-medium text-emerald-300 bg-zinc-800 px-1.5 py-0.5 rounded">${cleanLatex(math)}</span>`);
+
+        return out.replace(/\u0000LINK(\d+)\u0000/g, (_, i) => links[Number(i)]);
+      }
+
+      function closeLists() {
+        if (inUl) { html += "</ul>"; inUl = false; }
+        if (inOl) { html += "</ol>"; inOl = false; }
+      }
+
+      function isTableRow(line) {
+        return line.startsWith("|") && line.endsWith("|") && line.length > 2;
+      }
+      function isTableSeparator(line) {
+        return /^\|[\s:\-\|]+\|$/.test(line);
+      }
+      function parseTableCells(line) {
+        return line.slice(1, -1).split("|").map((c) => c.trim());
+      }
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) {
+          closeLists();
+          continue;
+        }
+
+        if (/^(-{3,}|\*{3,})$/.test(line)) {
+          closeLists();
+          html += '<hr class="my-3 border-zinc-700" />';
+          continue;
+        }
+
+        if (isTableRow(line) && i + 1 < lines.length && isTableSeparator(lines[i + 1].trim())) {
+          closeLists();
+          const headers = parseTableCells(line);
+          i += 1;
+          let tableHtml = '<div class="w-full max-w-full overflow-x-auto my-3 rounded-xl border border-zinc-700/80"><table class="w-full text-left border-collapse text-xs">';
+          tableHtml += '<thead class="bg-[#1a1a1a] border-b border-zinc-700 text-zinc-200"><tr>';
+          headers.forEach((h) => {
+            tableHtml += `<th class="px-3.5 py-2 font-semibold">${inlineFormat(h)}</th>`;
+          });
+          tableHtml += '</tr></thead><tbody class="divide-y divide-zinc-800 bg-[#252525]">';
+          while (i + 1 < lines.length && isTableRow(lines[i + 1].trim())) {
+            i += 1;
+            const cells = parseTableCells(lines[i].trim());
+            tableHtml += '<tr class="hover:bg-zinc-800/40">';
+            headers.forEach((_, colIdx) => {
+              tableHtml += `<td class="px-3.5 py-2 text-zinc-300 align-top">${inlineFormat(cells[colIdx] || "")}</td>`;
+            });
+            tableHtml += '</tr>';
+          }
+          tableHtml += '</tbody></table></div>';
+          html += tableHtml;
+          continue;
+        }
+
+        const ulMatch = line.match(/^[\*\-]\s+(.*)$/);
+        const olMatch = line.match(/^(\d+)\.\s+(.*)$/);
+        const hMatch = line.match(/^(#{1,3})\s+(.*)$/);
+
+        if (ulMatch) {
+          if (inOl) { html += "</ol>"; inOl = false; }
+          if (!inUl) { html += '<ul class="list-disc pl-5 space-y-1.5 my-2">'; inUl = true; }
+          html += `<li>${inlineFormat(ulMatch[1])}</li>`;
+        } else if (olMatch) {
+          if (inUl) { html += "</ul>"; inUl = false; }
+          if (!inOl) { html += '<ol class="list-decimal pl-5 space-y-1.5 my-2">'; inOl = true; }
+          html += `<li value="${olMatch[1]}">${inlineFormat(olMatch[2])}</li>`;
+        } else if (hMatch) {
+          closeLists();
+          const lvl = hMatch[1].length;
+          const cls = lvl === 1 ? "text-base font-bold text-white mt-4 mb-2" : "text-sm font-semibold text-white mt-3 mb-1.5";
+          html += `<div class="${cls}">${inlineFormat(hMatch[2])}</div>`;
+        } else {
+          closeLists();
+          html += `<p class="my-2 first:mt-0 last:mb-0">${inlineFormat(line)}</p>`;
+        }
+      }
+      closeLists();
+      return html;
+    }
+
+    // Sidebar Toggle
+    window.toggleSidebar = function (force) {
+      const sidebar = document.getElementById("chatSidebar");
+      const overlay = document.getElementById("sidebarOverlay");
+      const isClosed = sidebar.classList.contains("-translate-x-full");
+      const shouldOpen = typeof force === "boolean" ? force : isClosed;
+
+      if (shouldOpen) {
+        sidebar.classList.remove("-translate-x-full");
+        overlay.classList.remove("hidden");
+      } else {
+        sidebar.classList.add("-translate-x-full");
+        overlay.classList.add("hidden");
+      }
+    };
+
+    // Auth Helper
+    function getToken() {
+      return localStorage.getItem(TOKEN_KEY) || "";
+    }
+
+    function setToken(token) {
+      if (token) localStorage.setItem(TOKEN_KEY, token);
+      else localStorage.removeItem(TOKEN_KEY);
+    }
+
+    async function checkAuthSession() {
+      const token = getToken();
+      if (!token) {
+        currentUser = null;
+        renderAuthUI();
+        return;
+      }
+      try {
+        const res = await fetch("/api/auth/me", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          currentUser = data.user;
+        } else {
+          setToken("");
+          currentUser = null;
+        }
+      } catch {
+        currentUser = null;
+      }
+      renderAuthUI();
+    }
+
+    function renderAuthUI() {
+      const profileBox = document.getElementById("authProfileBox");
+      const topBtn = document.getElementById("authBtnTop");
+      const roleBadge = document.getElementById("roleBadge");
+
+      if (currentUser) {
+        topBtn.classList.add("hidden");
+        const role = (currentUser.role || "mahasiswa").toUpperCase();
+        roleBadge.textContent = role;
+        roleBadge.className = currentUser.role === "dosen"
+          ? "text-[10px] font-medium px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/30 uppercase tracking-wide"
+          : "text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-wide";
+
+        const initial = (currentUser.full_name || currentUser.username || "U")[0].toUpperCase();
+        profileBox.innerHTML = `
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 text-white font-bold text-xs flex items-center justify-center shrink-0">
+              ${initial}
+            </div>
+            <div class="min-w-0">
+              <div class="text-xs font-semibold text-white truncate">${escapeHtml(currentUser.full_name)}</div>
+              <div class="text-[10px] text-zinc-400 truncate">@${escapeHtml(currentUser.username)} · ${role}</div>
+            </div>
+          </div>
+          <button type="button" onclick="logout()" title="Logout" class="text-zinc-400 hover:text-red-400 p-1.5 rounded-lg hover:bg-zinc-800 transition cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+            </svg>
+          </button>
+        `;
+      } else {
+        topBtn.classList.remove("hidden");
+        roleBadge.textContent = "TAMU";
+        roleBadge.className = "text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 uppercase tracking-wide";
+
+        profileBox.innerHTML = `
+          <button type="button" onclick="openAuthModal()" class="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-white transition border border-zinc-700 cursor-pointer">
+            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7 0 3.75 3.75 0 017 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+            </svg>
+            <span>Masuk / Daftar Akun</span>
+          </button>
+        `;
+      }
+    }
+
+    window.logout = function () {
+      setToken("");
+      currentUser = null;
+      renderAuthUI();
+      loadConversations();
+      createNewChat();
+    };
+
+    // Auth Modal handling
+    window.openAuthModal = function (tab = 'login') {
+      document.getElementById("authModal").classList.remove("hidden");
+      document.getElementById("authAlert").classList.add("hidden");
+      switchAuthTab(tab);
+    };
+
+    window.closeAuthModal = function () {
+      document.getElementById("authModal").classList.add("hidden");
+    };
+
+    window.switchAuthTab = function (tab) {
+      const loginForm = document.getElementById("loginForm");
+      const regForm = document.getElementById("registerForm");
+      const tabLogin = document.getElementById("tabLoginBtn");
+      const tabReg = document.getElementById("tabRegisterBtn");
+      const alert = document.getElementById("authAlert");
+      alert.classList.add("hidden");
+
+      if (tab === "register") {
+        loginForm.classList.add("hidden");
+        regForm.classList.remove("hidden");
+        tabReg.className = "flex-1 py-2.5 text-center border-b-2 border-emerald-500 text-white transition";
+        tabLogin.className = "flex-1 py-2.5 text-center border-b-2 border-transparent text-zinc-400 hover:text-white transition";
+      } else {
+        loginForm.classList.remove("hidden");
+        regForm.classList.add("hidden");
+        tabLogin.className = "flex-1 py-2.5 text-center border-b-2 border-emerald-500 text-white transition";
+        tabReg.className = "flex-1 py-2.5 text-center border-b-2 border-transparent text-zinc-400 hover:text-white transition";
+      }
+    };
+
+    // Quick Login Demo
+    window.quickLogin = async function (username, password) {
+      document.getElementById("loginUsername").value = username;
+      document.getElementById("loginPassword").value = password;
+      await handleLogin(username, password);
+    };
+
+    async function handleLogin(username, password) {
+      const alert = document.getElementById("authAlert");
+      alert.classList.add("hidden");
+      try {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert.textContent = data.detail || "Login gagal.";
+          alert.classList.remove("hidden");
+          return;
+        }
+        setToken(data.token);
+        currentUser = data.user;
+        closeAuthModal();
+        renderAuthUI();
+        await loadConversations();
+        createNewChat();
+      } catch (err) {
+        alert.textContent = "Terjadi kendala jaringan.";
+        alert.classList.remove("hidden");
+      }
+    }
+
+    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const u = document.getElementById("loginUsername").value.trim();
+      const p = document.getElementById("loginPassword").value;
+      await handleLogin(u, p);
+    });
+
+    document.getElementById("registerForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const alert = document.getElementById("authAlert");
+      alert.classList.add("hidden");
+
+      const username = document.getElementById("regUsername").value.trim();
+      const full_name = document.getElementById("regFullName").value.trim();
+      const role = document.getElementById("regRole").value;
+      const password = document.getElementById("regPassword").value;
+
+      try {
+        const res = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, full_name, password, role }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert.textContent = data.detail || "Registrasi gagal.";
+          alert.classList.remove("hidden");
+          return;
+        }
+        setToken(data.token);
+        currentUser = data.user;
+        closeAuthModal();
+        renderAuthUI();
+        await loadConversations();
+        createNewChat();
+      } catch (err) {
+        alert.textContent = "Gagal terhubung ke server.";
+        alert.classList.remove("hidden");
+      }
+    });
+
+    // Conversations management
+    async function loadConversations() {
+      const listEl = document.getElementById("conversationsList");
+      const token = getToken();
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      try {
+        const res = await fetch("/api/conversations", { headers });
+        const data = await res.json();
+        conversations = data.conversations || [];
+
+        if (conversations.length === 0) {
+          listEl.innerHTML = `
+            <div class="text-[11px] font-semibold text-zinc-500 uppercase px-3 py-2 tracking-wider">Riwayat Chat</div>
+            <div class="text-xs text-zinc-500 px-3 py-6 text-center">Belum ada percakapan.<br>Mulai chat baru sekarang!</div>
+          `;
+          return;
+        }
+
+        let html = '<div class="text-[11px] font-semibold text-zinc-500 uppercase px-3 py-2 tracking-wider">Riwayat Chat</div>';
+        conversations.forEach((c) => {
+          const isActive = c.id === activeConversationId;
+          html += `
+            <div class="group relative flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium cursor-pointer transition ${isActive ? 'bg-[#212121] text-white border border-zinc-700/60' : 'text-zinc-400 hover:bg-[#212121] hover:text-zinc-200'}">
+              <button type="button" onclick="selectConversation('${c.id}')" class="flex-1 text-left truncate flex items-center gap-2 min-w-0">
+                <svg class="w-3.5 h-3.5 shrink-0 text-zinc-500 group-hover:text-emerald-400 transition" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+                <span class="truncate">${escapeHtml(c.title)}</span>
+              </button>
+              <button type="button" onclick="deleteConversation('${c.id}', event)" title="Hapus chat" class="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 p-1 rounded transition">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
+          `;
+        });
+        listEl.innerHTML = html;
+      } catch {
+        listEl.innerHTML = `<div class="text-xs text-zinc-500 px-3 py-6 text-center">Gagal memuat riwayat.</div>`;
+      }
+    }
+
+    window.createNewChat = async function () {
+      activeConversationId = null;
+      document.getElementById("headerChatTitle").textContent = "ChatGPT RAG · Layanan SSC";
+      document.getElementById("welcomeScreen").classList.remove("hidden");
+      document.getElementById("messagesList").innerHTML = "";
+      loadConversations();
+      setTimeout(() => document.getElementById("messageInput").focus(), 50);
+      toggleSidebar(false);
+    };
+
+    window.selectConversation = async function (convId) {
+      activeConversationId = convId;
+      toggleSidebar(false);
+      loadConversations();
+
+      const welcomeScreen = document.getElementById("welcomeScreen");
+      const listEl = document.getElementById("messagesList");
+      listEl.innerHTML = `<div class="text-center text-xs text-zinc-500 py-12">Memuat percakapan...</div>`;
+
+      const token = getToken();
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      try {
+        const res = await fetch(`/api/conversations/${convId}`, { headers });
+        const data = await res.json();
+        if (!res.ok) {
+          listEl.innerHTML = `<div class="text-center text-xs text-red-400 py-12">Gagal memuat percakapan.</div>`;
+          return;
+        }
+
+        document.getElementById("headerChatTitle").textContent = data.conversation.title;
+        const messages = data.messages || [];
+
+        if (messages.length === 0) {
+          welcomeScreen.classList.remove("hidden");
+          listEl.innerHTML = "";
+        } else {
+          welcomeScreen.classList.add("hidden");
+          listEl.innerHTML = "";
+          messages.forEach((m) => {
+            if (m.role === "user") appendUserMessage(m.content);
+            else appendAssistantMessage(m.content, m.sources || []);
+          });
+        }
+        scrollChatToBottom();
+      } catch {
+        listEl.innerHTML = `<div class="text-center text-xs text-red-400 py-12">Koneksi terputus.</div>`;
+      }
+    };
+
+    window.deleteConversation = async function (convId, e) {
+      if (e) e.stopPropagation();
+      if (!confirm("Hapus percakapan ini?")) return;
+
+      const token = getToken();
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      await fetch(`/api/conversations/${convId}`, { method: "DELETE", headers });
+      if (activeConversationId === convId) {
+        createNewChat();
+      } else {
+        loadConversations();
+      }
+    };
+
+    // Chat Message Rendering
+    function appendUserMessage(text) {
+      const container = document.getElementById("messagesList");
+      const div = document.createElement("div");
+      div.className = "flex justify-end";
+      div.innerHTML = `
+        <div class="max-w-[85%] sm:max-w-xl bg-[#2f2f2f] text-zinc-100 rounded-3xl px-4 py-3 shadow-xs border border-zinc-700/50">
+          <p class="text-sm leading-relaxed whitespace-pre-wrap">${escapeHtml(text)}</p>
+        </div>
+      `;
+      container.appendChild(div);
+      scrollChatToBottom();
+    }
+
+    function appendAssistantMessage(text, sources = []) {
+      const container = document.getElementById("messagesList");
+      const div = document.createElement("div");
+      div.className = "flex items-start gap-3";
+
+      let sourcesHtml = "";
+      if (sources && sources.length > 0) {
+        const items = sources.map((s) => `
+          <button type="button" onclick="openSourceModal(${Number(s.document_id)}, '${escapeHtml(s.title)}')"
+            class="inline-flex items-center gap-1.5 text-xs bg-[#1a1a1a] hover:bg-zinc-800 text-zinc-300 hover:text-white px-2.5 py-1.5 rounded-xl border border-zinc-700/80 transition cursor-pointer">
+            <svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            <span class="font-medium truncate max-w-[200px]">${escapeHtml(s.title)}</span>
+            <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1 rounded">${Math.round(s.score * 100)}%</span>
+          </button>
+        `).join("");
+
+        sourcesHtml = `
+          <div class="mt-4 pt-3 border-t border-zinc-700/60">
+            <div class="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-2">Sumber Dokumen Referensi</div>
+            <div class="flex flex-wrap gap-1.5">${items}</div>
+          </div>
+        `;
+      }
+
+      div.innerHTML = `
+        <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center font-bold text-xs shrink-0 mt-1 shadow-xs">
+          ✦
+        </div>
+        <div class="flex-1 min-w-0 bg-[#262626] border border-zinc-700/70 rounded-3xl p-4 sm:p-5 shadow-xs">
+          <div class="text-sm leading-relaxed text-zinc-200 break-words [overflow-wrap:anywhere]">${formatMarkdown(text)}</div>
+          ${sourcesHtml}
+        </div>
+      `;
+      container.appendChild(div);
+      scrollChatToBottom();
+    }
+
+    function showLoadingIndicator() {
+      const container = document.getElementById("messagesList");
+      const div = document.createElement("div");
+      div.id = "chatLoadingBubble";
+      div.className = "flex items-start gap-3";
+      div.innerHTML = `
+        <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center font-bold text-xs shrink-0 mt-1 shadow-xs animate-pulse">
+          ✦
+        </div>
+        <div class="bg-[#262626] border border-zinc-700/70 rounded-3xl px-4 py-3 flex items-center gap-2 text-xs text-zinc-400">
+          <span class="inline-flex gap-1">
+            <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce"></span>
+            <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce [animation-delay:0.15s]"></span>
+            <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce [animation-delay:0.3s]"></span>
+          </span>
+          <span>Mencari dokumen &amp; menyusun jawaban...</span>
+        </div>
+      `;
+      container.appendChild(div);
+      scrollChatToBottom();
+    }
+
+    function removeLoadingIndicator() {
+      const el = document.getElementById("chatLoadingBubble");
+      if (el) el.remove();
+    }
+
+    function scrollChatToBottom() {
+      const container = document.getElementById("messagesContainer");
+      container.scrollTop = container.scrollHeight;
+    }
+
+    // Input & Form Submission
+    const messageInput = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const chatInputForm = document.getElementById("chatInputForm");
+
+    messageInput.addEventListener("input", () => {
+      messageInput.style.height = "auto";
+      messageInput.style.height = Math.min(messageInput.scrollHeight, 140) + "px";
+    });
+
+    messageInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        chatInputForm.requestSubmit();
+      }
+    });
+
+    window.sendQuickPrompt = function (text) {
+      messageInput.value = text;
+      chatInputForm.requestSubmit();
+    };
+
+    chatInputForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const question = messageInput.value.trim();
+      if (!question) return;
+
+      document.getElementById("welcomeScreen").classList.add("hidden");
+      appendUserMessage(question);
+      messageInput.value = "";
+      messageInput.style.height = "auto";
+      sendBtn.disabled = true;
+      showLoadingIndicator();
+
+      const token = getToken();
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      try {
+        // Jika belum ada percakapan aktif, buat percakapan baru di backend
+        if (!activeConversationId) {
+          const createRes = await fetch("/api/conversations", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              title: question.slice(0, 45) + (question.length > 45 ? "..." : ""),
+              role: currentUser ? currentUser.role : "mahasiswa"
+            }),
+          });
+          const createData = await createRes.json();
+          if (createRes.ok && createData.conversation) {
+            activeConversationId = createData.conversation.id;
+            document.getElementById("headerChatTitle").textContent = createData.conversation.title;
+          }
+        }
+
+        let botAnswer = "";
+        let botSources = [];
+
+        if (activeConversationId) {
+          const res = await fetch(`/api/conversations/${activeConversationId}/messages`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ message: question }),
+          });
+          const data = await res.json();
+          removeLoadingIndicator();
+          botAnswer = res.ok ? data.answer : (data.detail || "Terjadi kesalahan.");
+          botSources = res.ok ? (data.sources || []) : [];
+        } else {
+          // Fallback ke endpoint chat publik langsung
+          const res = await fetch("/api/chat", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              question,
+              role: currentUser ? currentUser.role : "mahasiswa"
+            }),
+          });
+          const data = await res.json();
+          removeLoadingIndicator();
+          botAnswer = res.ok ? data.answer : (data.detail || "Terjadi kesalahan.");
+          botSources = res.ok ? (data.sources || []) : [];
+        }
+
+        appendAssistantMessage(botAnswer, botSources);
+        loadConversations();
+      } catch (err) {
+        removeLoadingIndicator();
+        appendAssistantMessage("Gagal menghubungi server AI.");
+      } finally {
+        sendBtn.disabled = false;
+        messageInput.focus();
+      }
+    });
+
+    // Document Preview Modal
+    window.openSourceModal = async function (docId, fallbackTitle) {
+      const modal = document.getElementById("sourceModal");
+      const titleEl = document.getElementById("sourceModalTitle");
+      const metaEl = document.getElementById("sourceModalMeta");
+      const bodyEl = document.getElementById("sourceModalBody");
+      const dlEl = document.getElementById("sourceModalDownload");
+
+      titleEl.textContent = fallbackTitle || "Memuat dokumen...";
+      metaEl.textContent = "";
+      dlEl.classList.add("hidden");
+      bodyEl.innerHTML = `<div class="text-xs text-zinc-500 py-8 text-center">Mengambil isi dokumen...</div>`;
+      modal.classList.remove("hidden");
+
+      const token = getToken();
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      try {
+        const res = await fetch(`/api/public/documents/${docId}`, { headers });
+        const data = await res.json();
+        if (!res.ok) {
+          bodyEl.innerHTML = `<div class="text-xs text-red-400 py-8 text-center">${escapeHtml(data.detail || "Dokumen tidak ditemukan.")}</div>`;
+          return;
+        }
+        const doc = data.document;
+        const content = data.content || "";
+        titleEl.textContent = doc.title;
+        metaEl.textContent = `Format ${doc.file_type.toUpperCase()} · ${doc.total_chunks} chunks`;
+        dlEl.href = data.url;
+        dlEl.classList.remove("hidden");
+
+        bodyEl.innerHTML = !content.trim()
+          ? `<div class="text-xs text-zinc-500 py-8 text-center">Isi dokumen kosong.</div>`
+          : `<div class="bg-[#242424] border border-zinc-700/80 rounded-xl p-4 text-xs leading-relaxed text-zinc-200">${formatMarkdown(content)}</div>`;
+      } catch {
+        bodyEl.innerHTML = `<div class="text-xs text-red-400 py-8 text-center">Gagal memuat isi dokumen.</div>`;
+      }
+    };
+
+    window.closeSourceModal = function () {
+      document.getElementById("sourceModal").classList.add("hidden");
+    };
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        closeSourceModal();
+        closeAuthModal();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        createNewChat();
+      }
+    });
+
+    // Startup Initialization
+    (async function init() {
+      await checkAuthSession();
+      await loadConversations();
+    })();
+  </script>
+</body>
+</html>
